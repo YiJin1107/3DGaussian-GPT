@@ -1,0 +1,97 @@
+Max Steps | First cycle: 146000
+Sanity Checking: 0it [00:00, ?it/s]
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+`Trainer(limit_val_batches=1.0)` was configured so 100% of the batches will be used..
+`Trainer(val_check_interval=1.0)` was configured so validation will run at the end of the training epoch..
+[rank: 0] Global seed set to 1998
+Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/1
+----------------------------------------------------------------------------------------------------
+distributed_backend=nccl
+All distributed processes registered. Starting with 1 processes
+----------------------------------------------------------------------------------------------------
+Restoring states from the checkpoint path at ../3DGS-GPT/runs/02051736_3DGaussTokens_ex1_gentle-boulevard/checkpoints/10-0.ckpt
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+  | Name        | Type          | Params
+----------------------------------------------
+0 | encoder     | Ptv3Encoder   | 46.4 M
+1 | pre_quant   | Linear        | 8.3 K
+2 | vq          | ResidualVQ    | 0
+3 | pos_encoder | Sequential    | 4.3 K
+4 | post_quant  | Linear        | 66.0 K
+5 | decoder     | ResNetDecoder | 17.8 M
+----------------------------------------------
+64.3 M    Trainable params
+0         Non-trainable params
+64.3 M    Total params
+257.162   Total estimated model params size (MB)
+
+
+
+Epoch 11:   0%|                                                                               | 0/73 [00:00<?, ?it/s]
+Error executing job with overrides: []
+Traceback (most recent call last):
+  File "e:\User\Workspace\Review\2DGS-GPT\3DGS-GPT\train_vocabulary.py", line 273, in main
+    trainer.fit(model, ckpt_path=resume)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\trainer\trainer.py", line 531, in fit
+    call._call_and_handle_interrupt(
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\trainer\call.py", line 41, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\strategies\launchers\subprocess_script.py", line 91, in launch
+    return function(*args, **kwargs)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\trainer\trainer.py", line 570, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\trainer\trainer.py", line 975, in _run
+    results = self._run_stage()
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\trainer\trainer.py", line 1018, in _run_stage
+    self.fit_loop.run()
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\loops\fit_loop.py", line 201, in run
+    self.advance()
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\loops\fit_loop.py", line 354, in advance
+    self.epoch_loop.run(self._data_fetcher)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\loops\training_epoch_loop.py", line 133, in run
+    self.advance(data_fetcher)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\loops\training_epoch_loop.py", line 220, in advance
+    batch_output = self.manual_optimization.run(kwargs)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\loops\optimization\manual.py", line 90, in run
+    self.advance(kwargs)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\loops\optimization\manual.py", line 109, in advance
+    training_step_output = call._call_strategy_hook(trainer, "training_step", *kwargs.values())
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\trainer\call.py", line 287, in _call_strategy_hook
+    output = fn(*args, **kwargs)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\strategies\ddp.py", line 328, in training_step
+    return self.model(*args, **kwargs)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\torch\nn\modules\module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\torch\nn\modules\module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\torch\nn\parallel\distributed.py", line 1519, in forward
+    else self._run_ddp_forward(*inputs, **kwargs)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\torch\nn\parallel\distributed.py", line 1355, in _run_ddp_forward
+    return self.module(*inputs, **kwargs)  # type: ignore[index]
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\torch\nn\modules\module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\torch\nn\modules\module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\overrides\base.py", line 90, in forward
+    output = self._forward_module.training_step(*inputs, **kwargs)
+  File "e:\User\Workspace\Review\2DGS-GPT\3DGS-GPT\train_vocabulary.py", line 71, in training_step
+    point = self.encoder(data)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\torch\nn\modules\module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\torch\nn\modules\module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "e:\User\Workspace\Review\2DGS-GPT\3DGS-GPT\model\PTv3encoder.py", line 978, in forward
+    point.serialization(order=self.order, shuffle_orders=self.shuffle_orders)
+  File "e:\User\Workspace\Review\2DGS-GPT\3DGS-GPT\model\PTv3encoder.py", line 115, in serialization
+    code = [
+  File "e:\User\Workspace\Review\2DGS-GPT\3DGS-GPT\model\PTv3encoder.py", line 116, in <listcomp>
+    encode(self.grid_coord, self.batch, depth, order=order_) for order_ in order
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\torch\utils\_contextlib.py", line 115, in decorate_context
+    return func(*args, **kwargs)
+  File "e:\User\Workspace\Review\2DGS-GPT\3DGS-GPT\serialization\default.py", line 23, in encode
+    code = batch << depth * 3 | code
+RuntimeError: The size of tensor a (23246) must match the size of tensor b (20847) at non-singleton dimension 0
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.

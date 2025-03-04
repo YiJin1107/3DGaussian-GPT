@@ -1,0 +1,30 @@
+Max Steps | First cycle: 146000
+Sanity Checking: 0it [00:00, ?it/s]
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+`Trainer(limit_val_batches=1.0)` was configured so 100% of the batches will be used..
+`Trainer(val_check_interval=1.0)` was configured so validation will run at the end of the training epoch..
+[rank: 0] Global seed set to 1895
+Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/1
+----------------------------------------------------------------------------------------------------
+distributed_backend=nccl
+All distributed processes registered. Starting with 1 processes
+----------------------------------------------------------------------------------------------------
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+  | Name        | Type          | Params
+----------------------------------------------
+0 | encoder     | Ptv3Encoder   | 46.4 M
+1 | pre_quant   | Linear        | 16.6 K
+2 | vq          | ResidualVQ    | 0
+3 | pos_encoder | Sequential    | 8.5 K
+4 | post_quant  | Linear        | 131 K
+5 | decoder     | ResNetDecoder | 17.8 M
+----------------------------------------------
+64.4 M    Trainable params
+0         Non-trainable params
+64.4 M    Total params
+
+
+

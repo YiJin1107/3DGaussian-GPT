@@ -1,0 +1,18 @@
+{
+    "os": "Windows-10-10.0.22631-SP0",
+    "python": "3.9.21",
+    "heartbeatAt": "2025-02-07T06:40:52.746809",
+    "startedAt": "2025-02-07T06:40:35.846237",
+    "docker": null,
+    "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+    "gpu_count": 1,
+    "cpu_count": 16,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "e:\\User\\Workspace\\Review\\2DGS-GPT\\3DGS-GPT\\train_vocabulary.py",
+    "codePath": "train_vocabulary.py",
+    "host": "YiJin",
+    "username": "25616",
+    "executable": "E:\\User\\Environment\\Anaconda\\MeshGPT\\python.exe"
+}

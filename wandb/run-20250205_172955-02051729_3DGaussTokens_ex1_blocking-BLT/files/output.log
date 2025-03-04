@@ -1,0 +1,37 @@
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+`Trainer(limit_val_batches=1.0)` was configured so 100% of the batches will be used..
+`Trainer(val_check_interval=1.0)` was configured so validation will run at the end of the training epoch..
+[rank: 0] Global seed set to 1338
+Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/1
+----------------------------------------------------------------------------------------------------
+distributed_backend=nccl
+All distributed processes registered. Starting with 1 processes
+----------------------------------------------------------------------------------------------------
+Restoring states from the checkpoint path at ../3DGS-GPT/runs/02051524_3DGaussTokens_ex1_ripe-attachment/checkpoints/00-0.ckpt
+Error executing job with overrides: []
+Traceback (most recent call last):
+  File "e:\User\Workspace\Review\2DGS-GPT\3DGS-GPT\train_vocabulary.py", line 273, in main
+    trainer.fit(model, ckpt_path='../3DGS-GPT/runs/02051524_3DGaussTokens_ex1_ripe-attachment/checkpoints/00-0.ckpt')
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\trainer\trainer.py", line 531, in fit
+    call._call_and_handle_interrupt(
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\trainer\call.py", line 41, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\strategies\launchers\subprocess_script.py", line 91, in launch
+    return function(*args, **kwargs)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\trainer\trainer.py", line 570, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\trainer\trainer.py", line 941, in _run
+    self._checkpoint_connector._restore_modules_and_callbacks(ckpt_path)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\trainer\connectors\checkpoint_connector.py", line 395, in _restore_modules_and_callbacks
+    self.resume_start(checkpoint_path)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\trainer\connectors\checkpoint_connector.py", line 82, in resume_start
+    loaded_checkpoint = self.trainer.strategy.load_checkpoint(checkpoint_path)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\pytorch_lightning\strategies\strategy.py", line 348, in load_checkpoint
+    return self.checkpoint_io.load_checkpoint(checkpoint_path)
+  File "E:\User\Environment\Anaconda\MeshGPT\lib\site-packages\lightning_fabric\plugins\io\torch_io.py", line 87, in load_checkpoint
+    raise FileNotFoundError(f"Checkpoint at {path} not found. Aborting training.")
+FileNotFoundError: Checkpoint at ../3DGS-GPT/runs/02051524_3DGaussTokens_ex1_ripe-attachment/checkpoints/00-0.ckpt not found. Aborting training.
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.

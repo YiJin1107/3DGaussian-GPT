@@ -1,0 +1,8 @@
+## 推理
+python inference/infer_meshgpt.py <ckpt_path> <sampling_mode> <num_samples>
+
+# for chairs
+python inference/infer_meshgpt.py pretrained/transformer_ft_03001627/checkpoints/2287-0.ckpt beam 25
+
+# for tables
+python inference/infer_meshgpt.py pretrained/transformer_ft_04379243/checkpoints/1607-0.ckpt beam 25

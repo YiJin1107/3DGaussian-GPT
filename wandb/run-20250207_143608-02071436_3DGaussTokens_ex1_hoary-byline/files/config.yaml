@@ -1,0 +1,70 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.13.4
+    framework: huggingface
+    huggingface_version: 4.33.0
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    m:
+    - 1: trainer/global_step
+      6:
+      - 3
+    python_version: 3.9.21
+    start_time: 1738910168.828403
+    t:
+      1:
+      - 1
+      - 9
+      - 11
+      - 41
+      - 49
+      - 50
+      - 55
+      - 63
+      - 77
+      2:
+      - 1
+      - 9
+      - 11
+      - 41
+      - 49
+      - 50
+      - 55
+      - 63
+      - 77
+      3:
+      - 7
+      - 13
+      - 14
+      - 23
+      4: 3.9.21
+      5: 0.13.4
+      6: 4.33.0
+      8:
+      - 3
+      - 8
+config:
+  desc: null
+  value: '{''in_channels'': 59, ''order'': ''("z", "z-trans", "hilbert", "hilbert-trans")'',
+    ''stride'': ''(2, 2, 2, 2)'', ''enc_depths'': ''(2, 2, 2, 6, 2)'', ''enc_channels'':
+    ''(32, 64, 128, 256, 512)'', ''enc_num_head'': ''(2, 4, 8, 16, 32)'', ''enc_patch_size'':
+    ''(1024, 1024, 1024, 1024, 1024)'', ''dec_depths'': ''(2, 2, 2, 2)'', ''dec_channels'':
+    ''(64, 64, 128, 256)'', ''dec_num_head'': ''(4, 4, 8, 16)'', ''dec_patch_size'':
+    ''(1024, 1024, 1024, 1024)'', ''mlp_ratio'': 4, ''qkv_bias'': True, ''qk_scale'':
+    0.25, ''attn_drop'': 0.0, ''proj_drop'': 0.0, ''drop_path'': 0.3, ''pre_norm'':
+    True, ''shuffle_orders'': True, ''enable_rpe'': False, ''enable_flash'': False,
+    ''upcast_attention'': False, ''upcast_softmax'': False, ''cls_mode'': False, ''pdnorm_bn'':
+    False, ''pdnorm_ln'': False, ''pdnorm_decouple'': True, ''pdnorm_adaptive'': False,
+    ''pdnorm_affine'': True, ''pdnorm_conditions'': ''("ScanNet", "S3DIS", "Structured3D")'',
+    ''embed_dim'': 128, ''n_embed'': 16384, ''embed_loss_weight'': 1.0, ''embed_levels'':
+    2, ''stochasticity'': 0.1, ''embed_share'': True, ''code_decay'': 0.99, ''cluster_size'':
+    10, ''wandb_main'': False, ''suffix'': ''-dev'', ''experiment'': ''02071436_3DGaussTokens_ex1_hoary-byline'',
+    ''seed'': 310, ''save_epoch'': 1, ''sanity_steps'': 1, ''val_check_percent'':
+    1.0, ''val_check_interval'': 1, ''resume'': None, ''logger'': ''wandb'', ''overfit'':
+    False, ''dataset'': ''shapenet'', ''category'': ''02773838'', ''grid_size'': 0.01,
+    ''batch_size'': 1, ''num_workers'': 1, ''lr'': 0.0001, ''force_lr'': None, ''max_epoch'':
+    2000, ''weight_decay'': 0.1, ''beta1'': 0.9, ''beta2'': 0.95, ''grad_clip'': 1.0,
+    ''warmup_steps'': 2000, ''min_lr'': 6e-05, ''gradient_accumulation_steps'': 2}'
