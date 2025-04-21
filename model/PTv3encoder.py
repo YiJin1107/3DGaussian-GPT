@@ -876,7 +876,8 @@ class PointTransformerV3(PointModule):
             ln_layer = nn.LayerNorm
         # activation layers
         act_layer = nn.GELU
-
+        
+        # embedding
         self.embedding = Embedding(
             in_channels=in_channels,
             embed_channels=enc_channels[0],

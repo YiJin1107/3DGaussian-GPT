@@ -18,9 +18,10 @@ import yaml
 from pathlib import Path
 
 class GaussTokenizationPTv3(pl.LightningModule):
-    def __init__(self,config):
+    def __init__(self,config,test_mode=False):
         super().__init__()
         self.config = config
+        self.test_mode = test_mode
         self.save_hyperparameters()
         self.automatic_optimization = False
         self.skip_quant = config.skip_quant
@@ -44,7 +45,7 @@ class GaussTokenizationPTv3(pl.LightningModule):
             torch.tensor([2, 10, 200, 10, 2], dtype=torch.float32, device=self.device).view(1, 1, -1))
         # dataset
         self.train_dataset = GaussianDataset(config=self.config,bin_config=self.bin_config)
-        self.val_dataset = GaussianDataset(config=self.config,bin_config=self.bin_config,split='val')
+        self.val_dataset = GaussianDataset(config=self.config,bin_config=self.bin_config,split='test')
         # encoder
         self.encoder = Ptv3Encoder(config)
         # vq
@@ -124,6 +125,8 @@ class GaussTokenizationPTv3(pl.LightningModule):
         return [optimizer], [scheduler]
 
     def training_step(self, data, batch_idx):
+        if self.test_mode:
+            return  # 在测试模式下跳过训练步骤
         optimizer = self.optimizers()
         scheduler = self.lr_schedulers()
         scheduler.step()  # type: ignore
@@ -267,6 +270,32 @@ class GaussTokenizationPTv3(pl.LightningModule):
 
             self._save_gaussian_ply(decoded_x, point['batch'].detach().cpu(), batch_idx,'val')
             self._save_gaussian_ply(yy, point['batch'].detach().cpu(), batch_idx,'o')
+            self._save_chamfer_distance(decoded_x,yy,point['batch'].detach().cpu(),batch_idx)
+
+    @rank_zero_only
+    def _save_chamfer_distance(self, decoded_x, target_x, batch_indices, batch_idx):
+        import os
+        from torch import cdist
+        import numpy as np
+        
+        # 创建保存目录
+        save_dir = Path("runs") / self.config.experiment / "CD"
+        save_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 分离不同样本的点云
+        unique_batches = torch.unique(batch_indices)
+        for bid in unique_batches:
+            mask = (batch_indices == bid)
+            decoded_points = decoded_x[mask]
+            target_points = target_x[mask]
+
+            # 计算倒角距离
+            dist_matrix = cdist(decoded_points, target_points)
+            chamfer_dist = dist_matrix.min(dim=1)[0].mean() + dist_matrix.min(dim=0)[0].mean()
+
+            # 保存结果到.txt文件
+            with open(save_dir / f'batch_{batch_idx}_sample_{bid.item()}_cd.txt', 'w') as f:
+                f.write(f"Chamfer Distance: {chamfer_dist.item()}\n")
 
     @rank_zero_only
     def _save_gaussian_ply(self, decoded_x, batch_indices, batch_idx,test):
@@ -333,8 +362,8 @@ class GaussTokenizationPTv3(pl.LightningModule):
         loader = DataLoader(
             self.val_dataset, 
             batch_size=self.config.batch_size, 
-            shuffle=True, 
-            drop_last=True, 
+            shuffle=False, 
+            drop_last=False, 
             num_workers=self.config.num_workers, 
             pin_memory=True,
             collate_fn=point_collate_fn
@@ -448,10 +477,10 @@ class GaussTokenizationPTv3(pl.LightningModule):
         pass
 
 # 使用Hydra库的装饰器 配置并管理python参数
-@hydra.main(config_path='./config', config_name='gaussiangpt', version_base='1.2')
+@hydra.main(config_path='./config', config_name='gaussiangpt_test', version_base='1.2')
 def main(config):
     trainer = create_trainer("3DGaussTokens", config)
-    model = GaussTokenizationPTv3(config)
+    model = GaussTokenizationPTv3(config,True)
     resume = './runs/car数据集前300epoch-wovq/checkpoints/299-0.ckpt'
     trainer.fit(model,ckpt_path=resume)
 

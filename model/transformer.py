@@ -18,17 +18,17 @@ class QuantSoupTransformer(TransformerBase):
         assert config.block_size is not None
         self.config = config
         self.padding_idx = 2
-        self.tokens_per_face = config.finemb_size
-        self.finemb_size = 3 + config.finemb_size  # 3 for start, stop pad, 3 for fin
-        self.foutemb_size = 3 + config.foutemb_size
-        vocab_size = vq_config.n_embed + 1 + 1 + 1  # +1 for start, +1 for stop, +1 for pad
+        self.tokens_per_gs = config.finemb_size
+        self.finemb_size = 3 + config.finemb_size  # 输入嵌入大小
+        self.foutemb_size = 3 + config.foutemb_size # 3 + D * blocksize
+        vocab_size = vq_config.n_embed + 1 + 1 + 1  # +1 for start, +1 for stop, +1 for pad 16384 + 3
         self.vocab_size = vocab_size
         print('Model Vocab Size:', vocab_size)
         print('Model Padding Index:', self.padding_idx)
         print('Model Fin Size:', self.finemb_size)
         print('Model Fout Size:', self.foutemb_size)
         self.input_layer = nn.Linear(vq_config.embed_dim, config.n_embd)
-        self.extra_embeds = nn.Embedding(3, config.n_embd, padding_idx=self.padding_idx)
+        self.extra_embeds = nn.Embedding(3, config.n_embd, padding_idx=self.padding_idx) # 处理额外嵌入 start,end,pad
         self.transformer = nn.ModuleDict(dict(
             wpe=nn.Embedding(config.block_size, config.n_embd),
             wfie=nn.Embedding(self.finemb_size, config.n_embd, padding_idx=self.padding_idx),
@@ -52,17 +52,17 @@ class QuantSoupTransformer(TransformerBase):
     def forward(self, idx, fin, fout, tokenizer, targets=None, kv_cache=None, mask_cache=None):
         use_kv_cache = kv_cache is not None
         device = idx.device
-        b, t = idx.size()
+        b, t = idx.size() # (B,t)
         assert t <= self.config.block_size, f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
 
-        embed = torch.zeros((b * t, self.config.n_embd), dtype=torch.float32, device=device)
-        idx_in_extra = torch.isin(idx, torch.LongTensor([0, 1, 2]).to(device)).reshape(-1)
-        idx_flat = idx.reshape(-1)
-        embed[idx_in_extra, :] = self.extra_embeds(idx_flat[idx_in_extra])
-        embed[~idx_in_extra, :] = self.input_layer(tokenizer.embed(idx_flat[~idx_in_extra] - 3))
+        embed = torch.zeros((b * t, self.config.n_embd), dtype=torch.float32, device=device) # (B*t,n_embd)
+        idx_in_extra = torch.isin(idx, torch.LongTensor([0, 1, 2]).to(device)).reshape(-1) # (B*t,)
+        idx_flat = idx.reshape(-1) # (B*t,)
+        embed[idx_in_extra, :] = self.extra_embeds(idx_flat[idx_in_extra]) # (extra,n_embd)
+        embed[~idx_in_extra, :] = self.input_layer(tokenizer.embed(idx_flat[~idx_in_extra] - 3)) # (b*t - extra,n_embd)
         tok_emb = embed.reshape(b, t, -1)  # token embeddings of shape (b, t, n_embd)
-        finemb = self.transformer.wfie(fin)  # face inner embeddings of shape (t, n_embd)
-        foutemb = self.transformer.wfoe(fout)  # face outer embeddings of shape (t, n_embd)
+        finemb = self.transformer.wfie(fin)  # face inner embeddings of shape (b,t, n_embd)
+        foutemb = self.transformer.wfoe(fout)  # face outer embeddings of shape (b,t, n_embd)
 
         # position embedding
 

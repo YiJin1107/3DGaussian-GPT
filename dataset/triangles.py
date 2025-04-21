@@ -187,6 +187,7 @@ class TriangleNodesWithSequenceIndices(TriangleNodes):
             max_face_sequence_len = max(max_face_sequence_len, sequence_len)
             min_face_sequence_len = min(min_face_sequence_len, sequence_len)
             self.sequence_indices.append((i, 0, False))
+            # 处理序列长度大于码本大小的情况
             for j in range(config.sequence_stride, max(1, sequence_len - self.block_size + self.padding + 1), config.sequence_stride):  # todo: possible bug? +1 added recently
                 self.sequence_indices.append((i, j, True if split == 'train' else False))
             if sequence_len > self.block_size: 

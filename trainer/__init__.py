@@ -17,8 +17,8 @@ from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
 from vector_quantize_pytorch import ResidualVQ
 
-from modelcopy.encoder import GraphEncoder
-from modelcopy.decoder import resnet34_decoder
+from model.PTv3encoder import Ptv3Encoder
+from model.decoder import resnet34_decoder
 from util.filesystem_logger import FilesystemLogger
 from util.misc import get_parameters_from_state_dict
 
@@ -121,7 +121,7 @@ def create_trainer(name, config):
             devices=[0],
             accelerator='gpu',
             precision=precision,
-            strategy=DDPStrategy(find_unused_parameters=False), # 使用分布式数据并行策略
+            strategy=DDPStrategy(find_unused_parameters=True), # 使用分布式数据并行策略
             num_sanity_val_steps=config.sanity_steps, # 验证步骤数量
             max_epochs=config.max_epoch, # 训练总轮数
             limit_val_batches=config.val_check_percent, # 使用验证集的比例
@@ -174,21 +174,43 @@ def create_conv_batch(encoded_features, batch, batch_size, device):
     return conv_input, conv_mask
 
 
-def get_rvqvae_v0_all(config, resume):
-    encoder, pre_quant, post_quant, vq = get_rvqvae_v0_encoder_vq(config, resume)
-    decoder = get_rvqvae_v0_decoder(config, resume)
-    return encoder, decoder, pre_quant, post_quant, vq
+# def get_rvqvae_v0_all(config, resume):
+#     encoder, pre_quant, post_quant, vq = get_rvqvae_v0_encoder_vq(config, resume)
+#     decoder = get_rvqvae_v0_decoder(config, resume)
+#     return encoder, decoder, pre_quant, post_quant, vq
 
 
 def get_rvqvae_v0_encoder_vq(config, resume):
-    state_dict = torch.load(resume, map_location="cpu")["state_dict"]
-    encoder = GraphEncoder(no_max_pool=config.g_no_max_pool, aggr=config.g_aggr, graph_conv=config.graph_conv, use_point_features=config.use_point_feats)
-    pre_quant = torch.nn.Linear(512, config.embed_dim)
-    post_quant = torch.nn.Linear(config.embed_dim, 512)
-
+    '''
+        功能:还原编码器与量化器
+    '''
+    state_dict = torch.load(resume + '', map_location="cpu")["state_dict"]
+    # 初始化
+    encoder = Ptv3Encoder(config)
+    pre_quant = torch.nn.Linear(config.enc_dim, config.embed_dim)
+    post_quant = torch.nn.Linear(config.embed_dim, config.enc_dim)
+    cluster_conv = torch.nn.Conv1d(
+        in_channels=config.enc_dim,
+        out_channels=config.enc_dim,
+        kernel_size=config.cluster_size,
+        stride=config.cluster_size,
+        padding=0,
+        groups=1
+    )
+    extend_deconv = torch.nn.ConvTranspose1d(
+        in_channels=config.enc_dim,
+        out_channels=config.enc_dim,
+        kernel_size=config.cluster_size,
+        stride=config.cluster_size,
+        padding=0,
+        output_padding=0
+    )
+    # 载入
     encoder.load_state_dict(get_parameters_from_state_dict(state_dict, "encoder"))
     pre_quant.load_state_dict(get_parameters_from_state_dict(state_dict, "pre_quant"))
     post_quant.load_state_dict(get_parameters_from_state_dict(state_dict, "post_quant"))
+    cluster_conv.load_state_dict(get_parameters_from_state_dict(state_dict,"cluster_conv"))
+    extend_deconv.load_state_dict(get_parameters_from_state_dict(state_dict,"extend_deconv"))
 
     vq = ResidualVQ(
         dim=config.embed_dim,
@@ -201,42 +223,20 @@ def get_rvqvae_v0_encoder_vq(config, resume):
         decay=config.code_decay,
     )
     vq.load_state_dict(get_parameters_from_state_dict(state_dict, "vq"))
-    return encoder, pre_quant, post_quant, vq
+    return encoder, pre_quant, post_quant, cluster_conv, extend_deconv,vq
 
 
 def get_rvqvae_v0_decoder(config, resume, device=torch.device("cpu")):
+    '''
+        功能:还原解码器
+    '''
     state_dict = torch.load(resume, map_location="cpu")["state_dict"]
-    decoder = resnet34_decoder(512, config.num_tokens - 2, config.ce_output)
+    decoder = resnet34_decoder(config.enc_dim,config.num_tokens,config.ce_output)
     decoder.load_state_dict(get_parameters_from_state_dict(state_dict, "decoder"))
     decoder = decoder.to(device).eval()
     return decoder
 
 
-def get_rvqvae_v1_encoder_vq(config, resume):
-    state_dict = torch.load(resume, map_location="cpu")["state_dict"]
-    encoder = GraphEncoder(no_max_pool=config.g_no_max_pool, aggr=config.g_aggr, graph_conv=config.graph_conv, use_point_features=config.use_point_feats, output_dim=576)
-    pre_quant = torch.nn.Linear(192, config.embed_dim)
-    post_quant = torch.nn.Linear(config.embed_dim * 3, 512)
-
-    encoder.load_state_dict(get_parameters_from_state_dict(state_dict, "encoder"))
-    pre_quant.load_state_dict(get_parameters_from_state_dict(state_dict, "pre_quant"))
-    post_quant.load_state_dict(get_parameters_from_state_dict(state_dict, "post_quant"))
-
-    vq = ResidualVQ(
-        dim=config.embed_dim,
-        codebook_size=config.n_embed,  # codebook size
-        num_quantizers=config.embed_levels,
-        commitment_weight=config.embed_loss_weight,  # the weight on the commitment loss
-        stochastic_sample_codes=True,
-        sample_codebook_temp=0.1,  # temperature for stochastically sampling codes, 0 would be equivalent to non-stochastic
-        shared_codebook=config.embed_share,
-        decay=config.code_decay,
-    )
-    vq.load_state_dict(get_parameters_from_state_dict(state_dict, "vq"))
-    return encoder, pre_quant, post_quant, vq
 
 
-def get_rvqvae_v1_all(config, resume):
-    encoder, pre_quant, post_quant, vq = get_rvqvae_v1_encoder_vq(config, resume)
-    decoder = get_rvqvae_v0_decoder(config, resume)
-    return encoder, decoder, pre_quant, post_quant, vq
+

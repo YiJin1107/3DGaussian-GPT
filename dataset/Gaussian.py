@@ -1,4 +1,4 @@
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from pathlib import Path
 import numpy as np
 import torch
@@ -9,39 +9,45 @@ import trimesh
 from collections.abc import Mapping, Sequence
 from torch.utils.data.dataloader import default_collate
 import os
+import omegaconf
+import yaml
+import math
 
 class GaussianDataset(Dataset):
-    def __init__(self,config,split='train',max_sh_degree=3):
+    def __init__(self,config,bin_config,split='train',max_sh_degree=3):
         super(GaussianDataset, self).__init__()
         self.split = split
         self.data_root = Path('data',config.dataset,config.category,split)
         self.data_list = self.get_data_list(self.data_root)
         self.discretize = config.ce_output
-
+        self.config = config
         self.max_rotation = config.max_rotation  # 最大旋转角度（度）
         self.scale_range = eval(config.scale_range)  # 缩放范围
         self.color_jitter = config.color_jitter  # 颜色扰动强度
         self.density_dropout = config.density_dropout  # 密度丢弃概率
         
 
-        self.bin_config = {
-            'coord': {'num_bins': config.coord_bins, 'min_max': (-0.5, 0.5)},      
-            'color': {'num_bins': config.color_bins, 'min_max': (-3, 6)},        
-            'opacity': {'num_bins': config.opacity_bins, 'min_max': (-6, 12)},        
-            'scale': {'num_bins': config.scale_bins, 'min_max': (-17, -2)},        
-            'rot': {'num_bins': config.rot_bins, 'min_max': (-2, 4)}           
-        }
+        self.bin_config = bin_config
+
+        self.data_cache = [self._load_single_data(path) for path in self.data_list]
 
     def prepare_data(self,idx):
         data_dict = self.get_data(idx)
         data_dict = self.transform_data(data_dict)
 
+
         if self.discretize:
             data_dict = self._discretize_gaussian(data_dict)
-            if False:
-                data_dict = self.reconstruct_from_discrete(data_dict)
-                self._save_gaussian_ply(data_dict,idx)
-                exit(-1)
+            # if True:
+            #     data_dict = self.reconstruct_from_discrete(data_dict)
+            #     self._save_gaussian_ply(data_dict,idx)
+            #     exit(-1)
+
+        feat = data_dict['feat']
+        feat_min = feat.min(dim=0, keepdim=True)[0]
+        feat_max = feat.max(dim=0, keepdim=True)[0]
+        data_dict['feat'] = (feat - feat_min) / (feat_max - feat_min + 1e-6)  # 防止除以0
+        
 
         return data_dict
 
@@ -55,8 +61,8 @@ class GaussianDataset(Dataset):
         data_list = list(data_root.glob('*'))  
         return data_list
 
-    def get_data(self, idx):
-        path = self.data_list[idx]  
+    def _load_single_data(self, path):
+        """加载单个PLY文件数据"""
         plydata = PlyData.read(path)
         
         coord = np.stack((np.asarray(plydata.elements[0]["x"]),
@@ -80,9 +86,11 @@ class GaussianDataset(Dataset):
     
         features = np.concatenate((coord, features_dc, opacities[:, None], scales, rots), axis=1)
         
-        data_dict = dict(coord=coord, feat=features)
-        
-        return data_dict
+        return dict(coord=coord, feat=features)
+    
+    def get_data(self, idx):
+        """直接从内存中获取数据"""
+        return self.data_cache[idx]
     
     def transform_data(self, data_dict):
         for key in data_dict:
@@ -115,6 +123,7 @@ class GaussianDataset(Dataset):
         path = self.data_list[idx]
         print(path)
         out_path = "test"
+
         # 将处理后的数据转换回ply格式
         processed_feat = data_dict['feat'].numpy()
         
@@ -238,90 +247,119 @@ class GaussianDataset(Dataset):
         """将高斯特征离散化为类别索引"""
         # 定义各特征的分箱参数（可根据实际数据分布调整）
         bin_config = self.bin_config
-
         # 获取特征张量
         feat = data_dict['feat']
-        
-        # 坐标离散化 (前3维)
-        coord_bins = torch.linspace(*bin_config['coord']['min_max'], bin_config['coord']['num_bins'])
-        coord_indices = torch.bucketize(feat[:, :3], coord_bins) - 1  # bucketize返回索引从1开始
-        coord_indices = coord_indices.clamp(0, bin_config['coord']['num_bins']-1)
+        # 初始化离散特征张量
+        discrete_feat = torch.zeros(feat.shape[0], 14, dtype=torch.long)
+        # 遍历每个特征值进行离散化
+        for i, (key, config) in enumerate(bin_config.items()):
+            if key == 'coord':
+                start, end = 0, 3
+            elif key == 'color':
+                start, end = 3, 6
+            elif key == 'opacity':
+                start, end = 6, 7
+            elif key == 'scale':
+                start, end = 7, 10
+            elif key == 'rot':
+                start, end = 10, 14
 
-        # 颜色特征离散化 (3-6维)
-        color_bins = torch.linspace(*bin_config['color']['min_max'], bin_config['color']['num_bins'])
-        color_indices = torch.bucketize(feat[:, 3:6], color_bins) - 1
-        color_indices = color_indices.clamp(0, bin_config['color']['num_bins']-1)
-        
-        # 透明度离散化 (第6维)
-        opacity_bins = torch.linspace(*bin_config['opacity']['min_max'], bin_config['opacity']['num_bins'])
-        opacity_indices = torch.bucketize(feat[:, 6], opacity_bins) - 1
-        opacity_indices = opacity_indices.clamp(0, bin_config['opacity']['num_bins']-1)
-        
-
-        # 缩放系数离散化 (7-9维)
-        scale_bins = torch.linspace(*bin_config['scale']['min_max'], bin_config['scale']['num_bins'])
-        scale_indices = torch.bucketize(feat[:, 7:10], scale_bins) - 1
-        scale_indices = scale_indices.clamp(0, bin_config['scale']['num_bins']-1)
-
-
-        # 旋转参数离散化 (10-13维)
-        rot_bins = torch.linspace(*bin_config['rot']['min_max'], bin_config['rot']['num_bins'])
-        rot_indices = torch.bucketize(feat[:, 10:14], rot_bins) - 1
-        rot_indices = rot_indices.clamp(0, bin_config['rot']['num_bins']-1)
-
-
-        # 合并所有离散特征
-        discrete_feat = torch.cat([
-            coord_indices,
-            color_indices,
-            opacity_indices.unsqueeze(1),
-            scale_indices,
-            rot_indices
-        ], dim=1).long()
+            # 对每个特征值生成分箱边界
+            for j in range(start, end):
+                bins = torch.linspace(config['min'][j - start], config['max'][j - start], config['num_bins'])
+                
+                # 对特征值进行分箱
+                indices = torch.bucketize(feat[:, j], bins) - 1
+                indices = indices.clamp(0, config['num_bins']-1)
+                
+                # 将离散化结果存入离散特征张量
+                discrete_feat[:, j] = indices
 
         # 更新数据字典
         data_dict['target'] = discrete_feat
-
         return data_dict
 
     def reconstruct_from_discrete(self, data_dict):
-        """从离散索引重建原始数据（近似值）"""        
+        """从离散索引重建原始数据（近似值）"""
         # 获取离散特征和分箱配置
         discrete_feat = data_dict['target']
         bin_config = self.bin_config
-
+        
         # 初始化重建后的特征张量
         reconstructed = torch.zeros(discrete_feat.shape[0], 14, dtype=torch.float32)
 
-        # 坐标重建 (前3维)
-        coord_bins = torch.linspace(*bin_config['coord']['min_max'], bin_config['coord']['num_bins'] + 1)
-        coord_values = (coord_bins[1:] + coord_bins[:-1]) / 2  # 取分箱中点
-        reconstructed[:, :3] = coord_values[discrete_feat[:, :3].clamp(0, len(coord_values)-1)]
+        # 遍历每个特征值进行重建
+        for i, (key, config) in enumerate(bin_config.items()):
+            if key == 'coord':
+                start, end = 0, 3
+            elif key == 'color':
+                start, end = 3, 6
+            elif key == 'opacity':
+                start, end = 6, 7
+            elif key == 'scale':
+                start, end = 7, 10
+            elif key == 'rot':
+                start, end = 10, 14
 
-        # 颜色特征重建 (3-6维)
-        color_bins = torch.linspace(*bin_config['color']['min_max'], bin_config['color']['num_bins'] + 1)
-        color_values = (color_bins[1:] + color_bins[:-1]) / 2
-        reconstructed[:, 3:6] = color_values[discrete_feat[:, 3:6].clamp(0, len(color_values)-1)]
+            # 对每个特征值生成分箱边界并进行线性插值
+            for j in range(start, end):
+                bins = torch.linspace(config['min'][j - start], config['max'][j - start], config['num_bins'] + 1)
+                # 计算每个离散索引对应的插值位置
+                indices = discrete_feat[:, j].clamp(0, len(bins)-2)  # 确保索引在有效范围内
+                alpha = (discrete_feat[:, j] - indices.float())  # 插值权重
+                # 线性插值
+                reconstructed[:, j] = (1 - alpha) * bins[indices] + alpha * bins[indices + 1]
 
-        # 透明度重建 (第6维)
-        opacity_bins = torch.linspace(*bin_config['opacity']['min_max'], bin_config['opacity']['num_bins'] + 1)
-        opacity_values = (opacity_bins[1:] + opacity_bins[:-1]) / 2
-        reconstructed[:, 6] = opacity_values[discrete_feat[:, 6].clamp(0, len(opacity_values)-1)]
-
-        # 缩放系数重建 (7-9维)
-        scale_bins = torch.linspace(*bin_config['scale']['min_max'], bin_config['scale']['num_bins'] + 1)
-        scale_values = (scale_bins[1:] + scale_bins[:-1]) / 2
-        reconstructed[:, 7:10] = scale_values[discrete_feat[:, 7:10].clamp(0, len(scale_values)-1)]
-
-        # 旋转参数重建 (10-13维)
-        rot_bins = torch.linspace(*bin_config['rot']['min_max'], bin_config['rot']['num_bins'] + 1)
-        rot_values = (rot_bins[1:] + rot_bins[:-1]) / 2
-        reconstructed[:, 10:14] = rot_values[discrete_feat[:, 10:14].clamp(0, len(rot_values)-1)]
-
-        # 更新数据字典
         data_dict['feat'] = reconstructed
         return data_dict
 
+class GaussianWithSequenceIndices(GaussianDataset):
+    def __init__(self,config,bin_config,split='train'):
+        super().__init__(config=config,bin_config=bin_config,split=split)
+        resume = './runs/car数据集前340epoch/config.yaml'
+        vq_cfg = omegaconf.OmegaConf.load(resume)
+        self.vq_depth = vq_cfg.embed_levels
+        self.block_size = config.block_size
+        print('vq_depth:',self.vq_depth)
+        print('block_size:',self.block_size)
+        max_inner_face_len = 0
+        self.padding = int(config.padding * self.block_size)
+        self.sequence_stride = config.sequence_stride
+
+        # length
+        self.sequence_indices = []
+        max_face_sequence_len = 0
+        min_face_sequence_len = 1e7
+
+        for i in range(len(self.data_cache)):
+            sequence_len = math.ceil(len(self.data_cache[i]['feat']) / config.cluster_size) * self.vq_depth + 1 + 1
+            max_face_sequence_len = max(max_face_sequence_len, sequence_len)
+            min_face_sequence_len = min(min_face_sequence_len, sequence_len)
+            self.sequence_indices.append((i, 0, False))
+            # 处理序列长度大于码本大小的情况
+            for j in range(config.sequence_stride, max(1, sequence_len - self.block_size + self.padding + 1), config.sequence_stride):  # todo: possible bug? +1 added recently
+                self.sequence_indices.append((i, j, True if split == 'train' else False))
+            if sequence_len > self.block_size: 
+                self.sequence_indices.append((i, sequence_len - self.block_size, False))
+        print('Length of', split, len(self.sequence_indices))
+        print('Shortest Gaussian sequence', min_face_sequence_len)
+        print('Longest Gaussian sequence', max_face_sequence_len)
+
+    def __len__(self):
+        return len(self.sequence_indices)
+    
+    def __getitem__(self, idx):
+        i, j, randomness = self.sequence_indices[idx] # i:Batch idx j:sequence start
+        if randomness:
+            sequence_len = math.ceil(len(self.data_cache[i]['feat']) / self.config.cluster_size) * self.vq_depth + 1 + 1
+            j = min(max(0, j + np.random.randint(-self.sequence_stride // 2, self.sequence_stride // 2)), sequence_len - self.block_size + self.padding)
+        data_dict = self.prepare_data(i)
+        data_dict['js'] = torch.tensor([j]).long()
+        return data_dict
+    
+    def get(self,idx):
+        return self.__getitem__(idx)
+    
 def collate_fn(batch):
     """
     collate function for point cloud which support dict and list,
@@ -364,10 +402,27 @@ def point_collate_fn(batch,mix_prob=0):
             )
     return batch
 
-@hydra.main(config_path='../3DGS-GPT/config', config_name='vocabulary', version_base='1.2')
+@hydra.main(config_path='../config', config_name='gaussiangpt', version_base='1.2')
 def main(config):
-    dataset = GaussianDataset(config)
-    dataset.prepare_data(0)
+
+    category_config_path = Path('./config/bin') / f'{config.category}.yaml'
+    with open(category_config_path, 'r') as f:
+        category_config = yaml.safe_load(f)
+
+    bin_config = {
+        'coord': {'num_bins': config.coord_bins, 'min': category_config['coord']['min'], 'max': category_config['coord']['max']},      
+        'color': {'num_bins': config.color_bins, 'min': category_config['color']['min'], 'max': category_config['color']['max']},        
+        'opacity': {'num_bins': config.opacity_bins, 'min': category_config['opacity']['min'], 'max': category_config['opacity']['max']},        
+        'scale': {'num_bins': config.scale_bins, 'min': category_config['scale']['min'], 'max': category_config['scale']['max']},  
+        'rot': {'num_bins': config.rot_bins, 'min': category_config['rot']['min'], 'max': category_config['rot']['max']}           
+    }
+
+    dataset = GaussianWithSequenceIndices(config=config,bin_config=bin_config)
+    for i in range(1000):
+        data_dict = dataset[i]
+        if data_dict['js'] > 0:
+            print(data_dict['js'])
+            break
 
 if __name__ == '__main__':
     print('This is data')

@@ -1,0 +1,113 @@
+# model
+## encoder
+in_channels : 14 # feat d
+order : ("z", "z-trans", "hilbert", "hilbert-trans")
+stride : (2, 2, 2, 2)
+enc_depths : (2, 2, 2, 6, 2)
+enc_channels : (32, 64, 128, 256, 512)
+enc_dim : 128
+enc_num_head : (2, 4, 8, 16, 32)
+enc_patch_size : (1024, 1024, 1024, 1024, 1024)
+dec_depths : (2, 2, 2, 2)
+dec_channels : (128, 128, 256, 256)
+dec_num_head : (4, 4, 8, 16)
+dec_patch_size : (1024, 1024, 1024, 1024)
+mlp_ratio : 4
+qkv_bias : True
+qk_scale : 0.25
+attn_drop : 0.0
+proj_drop : 0.0
+drop_path : 0.3
+pre_norm : True
+shuffle_orders : True
+enable_rpe : False
+enable_flash : True
+upcast_attention : False
+upcast_softmax : False
+cls_mode : False
+pdnorm_bn : False
+pdnorm_ln : False
+pdnorm_decouple : False
+pdnorm_adaptive : False
+pdnorm_affine : True
+pdnorm_conditions : ("ScanNet", "S3DIS", "Structured3D")
+
+## RVQ
+embed_dim: 256   # vq embed dim
+n_embed: 131072  # vq num embeddings
+embed_loss_weight: 1.0
+embed_levels: 6  # rvq levels
+stochasticity: 0.1 # 原始0.1
+embed_share: True  # share embeddings across rvq levels
+code_decay: 0.99  # code decay for vq 原始00.99
+cluster_size: 32
+
+# trainer
+wandb_main: False
+suffix: ''
+experiment: car
+seed: null
+save_epoch: 10  # save every n epoch
+sanity_steps: 1  # sanity steps before the run
+val_check_percent: 1.0  # check this proportion of val set when evaluation runs
+val_check_interval: 1  # run evaluation every x% of the train set steps
+resume: null  # resume from a checkpoint
+logger: tb
+overfit: False  # overfitting dataloaders
+
+# data
+dataset: 'shapenet'
+category: '02958343'
+grid_size: 0.01
+batch_size: 2
+block_size: 4608
+padding: 0.0  
+num_workers: 1
+max_rotation: 30
+scale_range: (0.8, 1.2)
+color_jitter: 0.1
+density_dropout: 0.1
+
+
+# optimizer
+lr: 1e-4 # max learning rate
+force_lr: null
+max_epoch: 2000 # total number of training iterations
+weight_decay: 1e-1
+beta1: 0.9
+beta2: 0.95
+grad_clip: 1.0 # clip gradients at this value, or disable if == 0.0
+warmup_steps: 2000 # how many steps to warm up for
+min_lr: 6e-5 # minimum learning rate, should be ~= learning_rate/10 per Chinchilla
+gradient_accumulation_steps: 32
+
+
+num_tokens: 200
+ce_output: True
+pos_enc_weight: 0.1
+skip_quant: False # ***
+coord_bins: 200
+color_bins: 200
+opacity_bins: 200
+scale_bins: 200
+rot_bins: 200
+
+num_val_samples: 1  # number of meshes to visualize in evaluation
+max_val_tokens: 5000
+top_k_tokens: 200  # sampling top-k tokens
+top_p: 0.9  # p val for nucleus sampling
+temperature: 0.8  # temprature for sampling
+sequence_stride: 32  # use when sequences are larger than context length
+use_smoothed_loss: True  # smoothing over neighboring tokens in the quantized space
+
+
+# model
+model:
+  in_emb: 3
+  n_layer: 24
+  n_head: 16
+  n_embd: 768
+  dropout: 0.0 # for pretraining 0 is good, for finetuning try 0.1+
+  bias: False # do we use bias inside LayerNorm and Linear layers?
+vq_resume: 'runs/car数据集前340epoch/checkpoints/339-0.ckpt'
+ft_resume: null  # path to transformer trained on all categories when finetuning
