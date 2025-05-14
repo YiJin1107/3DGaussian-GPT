@@ -19,9 +19,9 @@ class QuantSoupTransformer(TransformerBase):
         self.config = config
         self.padding_idx = 2
         self.tokens_per_gs = config.finemb_size
-        self.finemb_size = 3 + config.finemb_size  # 输入嵌入大小
-        self.foutemb_size = 3 + config.foutemb_size # 3 + D * blocksize
-        vocab_size = vq_config.n_embed + 1 + 1 + 1  # +1 for start, +1 for stop, +1 for pad 16384 + 3
+        self.finemb_size = 3 + config.finemb_size  # 内部索引范围
+        self.foutemb_size = 3 + config.foutemb_size # 3 + D * blocksize 外部索引范围
+        vocab_size = vq_config.n_embed + 1 + 1 + 1  # 0 for start, 1 for stop, 2 for pad 16384 + 3
         self.vocab_size = vocab_size
         print('Model Vocab Size:', vocab_size)
         print('Model Padding Index:', self.padding_idx)
@@ -98,6 +98,7 @@ class QuantSoupTransformer(TransformerBase):
             logits = self.lm_head(x[:, [-1], :])  # note: using list [-1] to preserve the time dim
             loss = None
 
+        
         if not use_kv_cache:
             return logits, loss
         else:
@@ -160,20 +161,24 @@ class QuantSoupTransformer(TransformerBase):
             # append sampled index to the running sequence and continue
             idx = torch.cat((idx, idx_next), dim=1)
             last_fin_cond = current_fin[0, -1]
+            # 内部索引到最后一个 或者 第一次迭代并且idx的token长度为2时，这时要切换另一个Mesh了
+            # 当vq_depth为2时,内部索引包括 0 1 2 3 4 ，其中前三个是特殊索引，正确索引从3开始
             if last_fin_cond == self.finemb_size - 1 or (iteration == 0 and idx.shape[-1] == 2):
                 current_fin = torch.cat((current_fin, (3 * one_t[0]).unsqueeze(0).unsqueeze(0)), dim=1)
                 current_fout = torch.cat((current_fout, (current_fout[0, -1] + 1).unsqueeze(0).unsqueeze(0)), dim=1)
-            else:
+            else: # 不切换Mesh
                 current_fin = torch.cat((current_fin, (current_fin[0, -1] + 1).unsqueeze(0).unsqueeze(0)), dim=1)
                 current_fout = torch.cat((current_fout, (current_fout[0, -1]).unsqueeze(0).unsqueeze(0)), dim=1)
-            if idx_next == 1:
+            if idx_next == 1: # 结束token
                 return idx
         return None
 
 
     @torch.no_grad()
     def generate_with_beamsearch(self, idx, fin, fout, tokenizer, max_new_tokens=10000, use_kv_cache=False, beam_width=6):
-
+        '''
+            接受idx fin fout 调用forward获得logits
+        '''
         backup_beams = []
         backup_beam_prob = []
         max_new_tokens = self.config.block_size - idx.shape[-1]
